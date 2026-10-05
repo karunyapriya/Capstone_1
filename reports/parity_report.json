@@ -1,0 +1,13 @@
+{
+  "n_images": 2,
+  "sources": [
+    "demo_images/Tomato_Late_blight__2.jpg",
+    "demo_images/Potato___Early_blight__1.jpg"
+  ],
+  "max_abs_diff": 2.0650148258027912e-13,
+  "max_rel_diff": 1.6057724966470747e-13,
+  "worst_feature": "B1_R_skew",
+  "worst_feature_rel_diff": 1.6057724966470747e-13,
+  "tolerance": 0.0001,
+  "passed": true
+}

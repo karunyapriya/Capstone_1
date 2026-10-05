@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgriSense — Leaf Disease &amp; Smart Irrigation Advisory</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!-- Auth gate — shown until a session exists or guest mode is chosen -->
+<!-- ================================================================ -->
+<div id="authGate" class="authgate">
+  <div class="authgrid">
+    <div class="authhero">
+      <div class="brand">
+        <span class="mark">A</span>
+        <div>
+          <div class="wordmark">AgriSense</div>
+          <div class="sublabel">LEAF DISEASE · SMART IRRIGATION</div>
+        </div>
+      </div>
+      <div class="chips" id="gateChips"></div>
+      <h1>Diagnose a leaf.<br>Decide the water.</h1>
+      <p class="lede">Both models run inside this page. Your photograph is read by
+        the browser, never uploaded — and the app keeps working with the network
+        switched off.</p>
+      <div class="statlist">
+        <div class="statrow"><span class="statnum">15</span><span>crop–disease classes across tomato, potato and bell pepper</span></div>
+        <div class="statrow"><span class="statnum">97</span><span>colour, chromaticity, GLCM, LBP and shape features</span></div>
+        <div class="statrow"><span class="statnum">3 kB</span><span>of exported irrigation model, evaluated client-side</span></div>
+      </div>
+    </div>
+
+    <div class="authcard card">
+      <div class="authcard-head">
+        <h2 id="authTitle">Sign in</h2>
+        <p class="muted small">An account only stores your scan history — never a photo.</p>
+      </div>
+      <form id="authForm" class="authform" autocomplete="on">
+        <label>Email<input type="email" id="authEmail" required autocomplete="email"></label>
+        <label>Password<input type="password" id="authPassword" required autocomplete="current-password" minlength="6"></label>
+        <div id="authError" class="note warn" hidden></div>
+        <div id="authNotice" class="note info" hidden></div>
+        <button type="submit" class="btn block" id="authSubmit">Sign in</button>
+      </form>
+      <p class="switchline"><span id="authSwitchLead">No account yet?</span> <a href="#" id="authSwitch">Create one</a></p>
+      <div class="divider"><span></span><em>OR</em><span></span></div>
+      <button type="button" class="btn ghost block" id="guestBtn">Continue without signing in</button>
+      <p class="muted small tc">Full functionality. Nothing is uploaded either way — history simply isn't kept.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- Main app                                                          -->
+<!-- ================================================================ -->
+<div id="app" hidden>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">A</span>
+    <div>
+      <div class="wordmark">AgriSense</div>
+      <div class="sublabel">LEAF DISEASE · SMART IRRIGATION</div>
+    </div>
+  </div>
+  <div class="chips" id="statusChips"></div>
+  <div class="session">
+    <span class="sessionEmail" id="sessionEmail"></span>
+    <button class="btn small ghost" id="signOutBtn">Sign out</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab is-active" data-panel="panel-diagnose" role="tab">Diagnose</button>
+  <button class="tab" data-panel="panel-irrigate" role="tab">Irrigation</button>
+  <button class="tab" data-panel="panel-advisory" role="tab">Advisory</button>
+  <button class="tab" data-panel="panel-history" role="tab">History</button>
+  <button class="tab" data-panel="panel-about" role="tab">About</button>
+</nav>
+
+<main>
+
+<!-- ---------------------------------------------------------------- -->
+<section id="panel-diagnose" class="panel is-active">
+  <div class="grid two">
+    <div class="card">
+      <div class="cardhead"><h2>Leaf image</h2></div>
+      <div id="dropzone" class="dropzone">
+        <p class="dz-title">Drop a leaf photo here</p>
+        <p class="muted small">or</p>
+        <div class="row">
+          <label class="btn">Choose file<input type="file" id="fileInput" accept="image/*" hidden></label>
+        </div>
+        <p class="hint">One leaf, filling the frame, plain background, even light.</p>
+      </div>
+      <div class="preview">
+        <figure><canvas id="canvasSrc" width="160" height="160"></canvas><figcaption>Pre-processed 160×160</figcaption></figure>
+        <figure><canvas id="canvasMask" width="160" height="160"></canvas><figcaption>Leaf segmentation (ExGR + Otsu)</figcaption></figure>
+      </div>
+      <div class="note info small">Features are measured inside the mask only, so the background contributes nothing to the diagnosis.</div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><h2>Prediction</h2><span class="mono muted small" id="predMeta"></span></div>
+      <div id="diseaseOut" class="empty">Load an image to run the classifier.</div>
+      <div id="noModelNote" class="note warn" hidden>
+        <strong>No disease model loaded.</strong>
+        Train it in <code>notebooks/01_disease_model.ipynb</code>, which writes
+        <code>web/models/disease_model.json</code>. Until then the feature
+        extractor still runs, so you can verify segmentation and inspect the
+        97 features below.
+        <label class="btn small">Load a model file<input type="file" id="modelInput" accept="application/json" hidden></label>
+      </div>
+      <details id="featDetails" hidden>
+        <summary>Extracted features (97)</summary>
+        <div id="featTable" class="feattable"></div>
+      </details>
+      <p class="timing" id="timingOut"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section id="panel-irrigate" class="panel">
+  <div class="grid two">
+    <div class="card">
+      <div class="cardhead"><h2>Field inputs</h2><span class="mono muted small">10 sensor &amp; agronomic inputs</span></div>
+      <div class="fields">
+        <label>Soil type
+          <select id="in_soil">
+            <option value="sandy">Sandy</option>
+            <option value="loamy" selected>Loamy</option>
+            <option value="clayey">Clayey</option>
+          </select>
+        </label>
+        <label>Growth stage
+          <select id="in_stage">
+            <option value="initial">Initial (establishment)</option>
+            <option value="development">Development</option>
+            <option value="mid" selected>Mid-season (peak demand)</option>
+            <option value="late">Late season</option>
+            <option value="harvest">Harvest / ripening</option>
+          </select>
+        </label>
+        <label>Soil moisture <output id="o_vwc"></output>
+          <input type="range" id="in_vwc" min="4" max="45" step="0.5" value="17"></label>
+        <label>Soil temperature <output id="o_stemp"></output>
+          <input type="range" id="in_stemp" min="10" max="45" step="0.5" value="29"></label>
+        <label>Air temperature <output id="o_atemp"></output>
+          <input type="range" id="in_atemp" min="10" max="48" step="0.5" value="33"></label>
+        <label>Relative humidity <output id="o_rh"></output>
+          <input type="range" id="in_rh" min="10" max="100" step="1" value="48"></label>
+        <label>Rain, last 24 h <output id="o_rain"></output>
+          <input type="range" id="in_rain" min="0" max="60" step="0.5" value="0"></label>
+        <label>Rain forecast, next 24 h <output id="o_fcast"></output>
+          <input type="range" id="in_fcast" min="0" max="60" step="0.5" value="0"></label>
+        <label>Reference ET₀ <output id="o_et0"></output>
+          <input type="range" id="in_et0" min="0.5" max="10" step="0.1" value="5.5"></label>
+        <label>Days since last irrigation <output id="o_days"></output>
+          <input type="range" id="in_days" min="0" max="21" step="1" value="7"></label>
+      </div>
+      <div class="row gap">
+        <span class="mono muted small presetslabel">PRESETS</span>
+      </div>
+      <div class="row gap">
+        <button class="btn small ghost" data-preset="dry">Dry spell</button>
+        <button class="btn small ghost" data-preset="wet">After rain</button>
+        <button class="btn small ghost" data-preset="borderline">Borderline</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><h2>Water balance &amp; decision</h2><span class="mono muted small">FAO-56 · Allen et al. 1998</span></div>
+      <div id="irrigationOut"></div>
+      <details>
+        <summary>How this is computed</summary>
+        <p class="muted small">
+          Total available water <code>TAW = 1000 (θ<sub>FC</sub> − θ<sub>WP</sub>) Z<sub>r</sub></code>,
+          readily available water <code>RAW = p · TAW</code>, and root-zone depletion
+          <code>D<sub>r</sub> = 1000 (θ<sub>FC</sub> − θ<sub>obs</sub>) Z<sub>r</sub></code>
+          — FAO-56 (Allen et al., 1998). The classifier sees these derived
+          quantities alongside the raw sensor readings; the regressor predicts the
+          applied depth in mm.
+        </p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section id="panel-advisory" class="panel">
+  <div id="advisoryOut"></div>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section id="panel-history" class="panel">
+  <div class="card">
+    <div class="cardhead">
+      <div>
+        <h2>Scan history</h2>
+        <p class="muted small" id="histSub">&nbsp;</p>
+      </div>
+      <button class="btn small ghost danger" id="clearHistBtn">Clear all</button>
+    </div>
+    <div id="historyOut"></div>
+  </div>
+</section>
+
+<!-- ---------------------------------------------------------------- -->
+<section id="panel-about" class="panel">
+  <div class="card">
+    <h2>Models in this page</h2>
+    <div id="aboutOut"></div>
+    <h3>Why classical machine learning</h3>
+    <p>
+      Published CNNs reach 99%+ on the PlantVillage benchmark, but weigh tens to
+      hundreds of megabytes and need a server at inference time. This page carries
+      hand-designed colour, lesion-chromaticity, GLCM texture, LBP and shape
+      features into a conventional classifier, so the deployed model is small
+      enough to ship inside the page itself. Nothing you load here leaves your
+      device, and the page keeps working with the network switched off.
+    </p>
+    <h3>Honest limitations</h3>
+    <ul>
+      <li>The disease model is trained on laboratory-condition imagery. Accuracy on
+        real field photographs is measurably lower — the project reports that gap
+        rather than hiding it.</li>
+      <li>The irrigation model learns the FAO-56 reference policy from noisy
+        sensor observations. Its residual error is dominated by soil-moisture
+        sensor noise, not by model capacity.</li>
+      <li>This is decision support, not a prescription. Confirm any treatment with
+        a local extension officer before applying agro-chemicals.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>AgriSense · classical ML · client-side inference · no server, no tracking, no network calls after load (besides Supabase auth &amp; history)</p>
+</footer>
+
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
